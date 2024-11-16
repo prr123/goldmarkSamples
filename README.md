@@ -19,3 +19,6 @@ The js output file renders a html page in the browser.
  - adds meta data contained in a yaml file
  - adds style objects located in the style js file to style the output
 
+## md2jsV3: Performance enhancement
+
+	to come
