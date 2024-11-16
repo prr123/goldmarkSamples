@@ -20,6 +20,7 @@ type metaInp struct {
 	Title string `yaml:"title"`
 	Author string `yaml:"author"`
 	Date time.Time `yaml:"date"`
+	Name string `yaml:"name"`
 }
 
 func GetMeta(indata []byte) (meta *metaInp, err error) {
@@ -31,6 +32,15 @@ func GetMeta(indata []byte) (meta *metaInp, err error) {
 	return &metaData, nil
 }
 
+func PrintMeta(meta *metaInp) {
+
+	fmt.Println("****** MetaData ******")
+	fmt.Printf("Title:  %s\n", meta.Title)
+	fmt.Printf("Author: %s\n", meta.Author)
+	fmt.Printf("Name:   %s\n", meta.Name)
+//	fmt.Printf("Date:   %s\n", meta.Date.Format("2 Jan 2006")
+	fmt.Println("**** end MetaData ****")
+}
 
 // A Config struct has configurations for the HTML based renderers.
 type Config struct {
@@ -264,16 +274,18 @@ func WithUnsafe() interface {
 type Renderer struct {
 	count int
 	dbg bool
+	name string
 	Config
 }
 
 // NewRenderer returns a new Renderer with given options.
-func NewRenderer(dbg bool, opts ...Option) renderer.NodeRenderer {
+func NewRenderer(nam string, dbg bool, opts ...Option) renderer.NodeRenderer {
 //fmt.Println("dbg -- new renderer")
 //	if dbg {log.Println("new renderer -- debugging!")}
 	r := &Renderer{
 		Config: NewConfig(),
 	}
+	r.name = nam
 	r.dbg = dbg
 	for _, opt := range opts {
 		opt.SetHTMLOption(&r.Config)
@@ -387,6 +399,10 @@ func (r *Renderer) renderHeading(w util.BufWriter, source []byte, node ast.Node,
 		hdTyp := fmt.Sprintf("h%d",n.Level)
 		hdStr := "let " + elNam + "= document.createElement('" + hdTyp + "');\n"
 		_, _ = w.WriteString(hdStr)
+
+		hd2Str := "Object.assign(" + elNam + ".style, mdStyle." + hdTyp +");\n"
+//		hd2Str := elNam + ".style.fontSize = mdStyle." + hdTyp + ".fontSize;\n"
+		_, _ = w.WriteString(hd2Str)
 		if n.Attributes() != nil {RenderElAttributes(w, n, HeadingAttributeFilter, elNam)}
 	} else {
 		pnode := n.Parent()
@@ -1392,8 +1408,8 @@ func IsDangerousURL(url []byte) bool {
 		hasPrefix(url, bFile) || hasPrefix(url, bData)
 }
 
-func GetRenderer(dbg bool) (r renderer.Renderer) {
+func GetRenderer(nam string, dbg bool) (r renderer.Renderer) {
 	if dbg {log.Println("*** debugging ***")}
-	r = renderer.NewRenderer(renderer.WithNodeRenderers(util.Prioritized(NewRenderer(dbg), 1000)))
+	r = renderer.NewRenderer(renderer.WithNodeRenderers(util.Prioritized(NewRenderer(nam, dbg), 1000)))
 	return r
 }
