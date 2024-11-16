@@ -13,12 +13,16 @@ program that reads a markdown file and writes a html file.
 A program that reads a markdown file and produces a js output file.  
 The js output file renders a html page in the browser.  
 
+status: in testing  
+
 ## conversion with the md2jsV2 renderer
 
 'simpleMd2JsConvV2'  
  - adds meta data contained in a yaml file
  - adds style objects located in the style js file to style the output
 
+status: in progress  
+
 ## md2jsV3: Performance enhancement
 
-	to come
+status: in design  
