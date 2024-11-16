@@ -1,4 +1,3 @@
-// Package html implements renderer that outputs HTMLs.
 package md2jsV2
 
 import (
@@ -8,11 +7,30 @@ import (
 	"strconv"
 	"unicode"
 	"unicode/utf8"
+	"time"
 
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/util"
+
+	"github.com/goccy/go-yaml"
 )
+
+type metaInp struct {
+	Title string `yaml:"title"`
+	Author string `yaml:"author"`
+	Date time.Time `yaml:"date"`
+}
+
+func GetMeta(indata []byte) (meta *metaInp, err error) {
+
+	var metaData metaInp
+	err = yaml.Unmarshal(indata, &metaData)
+	if err != nil {return nil, fmt.Errorf("unmarshall: %v", err)}
+
+	return &metaData, nil
+}
+
 
 // A Config struct has configurations for the HTML based renderers.
 type Config struct {
