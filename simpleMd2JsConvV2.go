@@ -16,7 +16,7 @@ import (
 	"os"
 	"bytes"
 
-	md2js 	"goDemo/goldmark/samples/rendererV2"
+	md2js "goDemo/goldmark/samples/rendererV2"
 
 	"github.com/yuin/goldmark"
 	util "github.com/prr123/utility/utilLib"
@@ -77,6 +77,7 @@ func main() {
     }
 
 	inFilnam := "md/" + inFil + ".md"
+	metaFilnam := "md/" + inFil + ".meta"
 	outFilnam := "script/" + outFil + ".js"
 	stylFilnam := "style/" + stylFil + ".js"
 
@@ -84,22 +85,33 @@ func main() {
 		fmt.Printf("input:  %s\n", inFilnam)
 		fmt.Printf("output: %s\n", outFilnam)
 		fmt.Printf("style:  %s\n", stylFilnam)
+		fmt.Printf("meta:   %s\n", metaFilnam)
 	}
 
 	source, err := os.ReadFile(inFilnam)
 	if err != nil {log.Fatalf("error -- open file: %v\n", err)}
 
-	styl, err := os.ReadFile(stylFilnam)
+	metaData, err := os.ReadFile(metaFilnam)
+	if err != nil {log.Printf("info -- no meta file: %v\n", err)}
+
+	stylData, err := os.ReadFile(stylFilnam)
 	if err != nil {log.Printf("info -- no style file: %v\n", err)}
 
 	oFil, err := os.Create(outFilnam)
 	if err != nil {log.Fatalf("error -- create out File: %v\n", err)}
 	defer oFil.Close()
 
-	_, err = oFil.Write(styl)
+	_, err = oFil.Write(stylData)
 	if err != nil {log.Fatalf("error -- writing style: %v\n", err)}
 
-	md2jsRen := md2js.GetRenderer(dbg)
+	if len(metaData) > 0 {
+		mData, err := md2js.GetMeta(metaData)
+		if err !=nil {log.Fatal("error -- converting meta: %v\n", err)}
+		md2js.PrintMeta(mData)
+	}
+
+	name:= "test"
+	md2jsRen := md2js.GetRenderer(name,dbg)
 	md := goldmark.New()
 	md.SetRenderer(md2jsRen)
 
