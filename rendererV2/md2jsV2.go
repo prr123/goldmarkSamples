@@ -1270,6 +1270,7 @@ func NewWriter(opts ...WriterOption) Writer {
 }
 
 func escapeRune(writer util.BufWriter, r rune) {
+/*
 	if r < 256 {
 		v := util.EscapeHTMLByte(byte(r))
 		if v != nil {
@@ -1277,6 +1278,7 @@ func escapeRune(writer util.BufWriter, r rune) {
 			return
 		}
 	}
+*/
 	_, _ = writer.WriteRune(util.ToValidRune(r))
 }
 
@@ -1359,7 +1361,7 @@ func (d *defaultWriter) Write(writer util.BufWriter, source []byte) {
 							v, _ := strconv.ParseUint(util.BytesToReadOnlyString(source[start:i]), 16, 32)
 							d.RawWrite(writer, source[n:pos])
 							n = i + 1
-							escapeRune(writer, rune(v))
+						 	escapeRune(writer, rune(v))
 							continue
 						}
 						// code point like #1234;
