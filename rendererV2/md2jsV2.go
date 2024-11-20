@@ -488,11 +488,11 @@ func (r *Renderer) renderCodeBlock(w util.BufWriter, source []byte, node ast.Nod
 //		r.Writer.RawWrite(w, line.Value(source))
 			data += string(line.Value(source))
 		}
-		el5Str := "let data='\n" + data + "'\n;"
+		el5Str := "const codeStr=`" + data + "`\n;"
 		_, _ = w.WriteString(el5Str)
 		r.count++
 		el3Nam := fmt.Sprintf("el%d",r.count)
-		el4Str := "let " + el3Nam + "= document.createTextNode(data);\n"
+		el4Str := "const " + el3Nam + "= document.createTextNode(codeStr);\n"
 		_, _ = w.WriteString(el4Str)
 		el6Str := el2Nam + ".appendChild(" + el3Nam + ");\n";
 		_, _ = w.WriteString(el6Str)
@@ -1094,14 +1094,15 @@ func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, en
 	r.count++
 	elNam := fmt.Sprintf("el%d",r.count)
 	n.SetAttributeString("el",elNam)
-
-	if n.IsRaw() {
-fmt.Println("dbg -- raw text")
-//		_, _ = w.WriteString(segment.Value(source))
-		r.Writer.RawWrite(w, segment.Value(source))
-	} else {
+//fmt.Printf("dbg -- el: %d raw text: %t\n", r.count, n.IsRaw())
 		value := segment.Value(source)
 		valStr := string(segment.Value(source))
+
+	if n.IsRaw() {
+//		_, _ = w.WriteString(segment.Value(source))
+//		r.Writer.RawWrite(w, segment.Value(source))
+
+	} else {
 
 		if n.HardLineBreak() || (n.SoftLineBreak() && r.HardWraps) {
 				valStr += "\n"
@@ -1125,12 +1126,13 @@ fmt.Println("dbg -- raw text")
 			}
 
 		}
-		DatEl := elNam + "Txt"
-		datStr := "const " + DatEl + "= `" + valStr + "`;\n"
-		_, _ = w.WriteString(datStr)
-		txtStr := "let "+elNam+ "=document.createTextNode(" + DatEl + ");\n"
-		_, _ = w.WriteString(txtStr)
 	}
+	DatEl := elNam + "Txt"
+	datStr := "const " + DatEl + "= `" + valStr + "`;\n"
+	_, _ = w.WriteString(datStr)
+	txtStr := "const "+elNam+ "=document.createTextNode(" + DatEl + ");\n"
+	_, _ = w.WriteString(txtStr)
+
 	return ast.WalkContinue, nil
 }
 
