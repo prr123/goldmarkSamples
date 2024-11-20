@@ -7,5 +7,7 @@ let mdStyle = {
 	h6: {fontSize: '1rem'},
 	p: {margin: '1rem 0'},
 	code: {fontFamily: 'monospace'},
-	block: {margin: '0px 40px'},
+	block: {margin: '0px 40px', color: 'purple', backgroundColor: 'lightgrey',},
+	ul: {margin: '0 0 0 10px'},
+	li: {listStylePosition: 'inside'},
 };
