@@ -524,7 +524,8 @@ func (r *Renderer) renderFencedCodeBlock(w util.BufWriter, source []byte, node a
 		r.count++
 		elNam := fmt.Sprintf("el%d",r.count)
 		node.SetAttributeString("el",elNam)
-		_, _ = w.WriteString("<pre><code")
+
+//		_, _ = w.WriteString("<pre><code")
 		language := n.Language(source)
 		if language != nil {
 			_, _ = w.WriteString(" class=\"language-")
@@ -708,13 +709,181 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, node ast.Nod
 
 		if node.Attributes() != nil {RenderElAttributes(w, node, ParagraphAttributeFilter, elNam)}
 
-	} else {
+		// render child nodes
+		r.renderTextChildren(w,source,node, true)
+
 		pnode := node.Parent()
 		if pnode == nil {return ast.WalkStop, fmt.Errorf("Par -- no pnode")}
-		elNam, res := node.AttributeString("el")
-		if !res {return ast.WalkStop, fmt.Errorf("Par -- no el name!")}
 		parElNam, res := pnode.AttributeString("el")
 		if !res {return ast.WalkStop, fmt.Errorf("Par -- no parent el name: %s!", elNam)}
+		if r.dbg {
+			dbgStr := fmt.Sprintf("// dbg -- par el: %s kind: %s parent:%s kind:%s\n", elNam, node.Kind().String(), parElNam, pnode.Kind().String())
+			_, _ = w.WriteString(dbgStr)
+		}
+		elStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+		_, _ = w.WriteString(elStr)
+
+	}
+	return ast.WalkSkipChildren, nil
+}
+
+
+func (r *Renderer) renderTextChildren(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+
+//seems redundant
+	if !entering {
+fmt.Printf("dbg -- children return\n")
+		return ast.WalkContinue, nil
+	}
+
+	var text []byte
+	parElNam, res := node.AttributeString("el")
+	if !res {return ast.WalkStop, fmt.Errorf("txt -- no el name!")}
+
+	if r.dbg {
+		dbgStr := fmt.Sprintf("// dbg -- pelNam: %s children: %d\n", parElNam, node.ChildCount())
+		_, _ = w.WriteString(dbgStr)
+	}
+
+	istate := 0
+	for c := node.FirstChild(); c != nil; c = c.NextSibling() {
+/*
+		if r.dbg {
+				parElNam, res := c.Parent().AttributeString("el")
+				dbgStr := fmt.Sprintf("//dbg -- par %t child: %s parent: %s\n", res, c.Kind().String(), parElNam)
+				_, _ = w.WriteString(dbgStr)
+			}
+*/
+		switch c.(type) {
+
+		case *ast.Text:
+        	segment := c.(*ast.Text).Segment
+        	value := segment.Value(source)
+
+//			if r.dbg {
+//				dbgStr := fmt.Sprintf("//dbg -- text (state: %d) val: %s\n", istate, value)
+//				_, _ = w.WriteString(dbgStr)
+//			}
+
+			switch istate {
+			// first text
+			case 0:
+				text = make([]byte, 0, 1024)
+				text = append(text, value...)
+				istate = 1
+			// adj text
+			case 1:
+				text = append(text, value...)
+			default:
+
+			}
+
+       case *ast.Emphasis:
+			en :=c.(*ast.Emphasis)
+			chn := en.FirstChild()
+        	segment := chn.(*ast.Text).Segment
+        	value := segment.Value(source)
+			tag := "em"
+			if en.Level == 2 {tag = "strong"}
+//			if r.dbg {
+//				dbgStr := fmt.Sprintf("//dbg -- emp (state: %d) lev: %d val: %s\n", istate, en.Level, value)
+//				_, _ = w.WriteString(dbgStr)
+//			}
+
+			switch istate{
+//			case 0:
+			// end text
+			case 1:
+				istate = 0
+				r.count++
+				elNam := fmt.Sprintf("el%d",r.count)
+				c.SetAttributeString("el",elNam)
+
+				txtEl := "const " + elNam + "=document.createTextNode(`"+string(text)+"`);\n"
+				_, _ = w.WriteString(txtEl)
+				apStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+				_, _ = w.WriteString(apStr)
+				text = nil
+				fallthrough
+			default:
+				r.count++
+				elNam := fmt.Sprintf("el%d",r.count)
+				elStr := "let " + elNam + "=document.createElement('" + tag + "');\n"
+				_, _ = w.WriteString(elStr)
+				eltxt := elNam + ".textContent='" + string(value) + "';\n"
+				_, _ = w.WriteString(eltxt)
+				apStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+				_, _ = w.WriteString(apStr)
+			}
+
+		case *ast.CodeSpan:
+/*
+			if r.dbg {
+				pnode := c.Parent()
+				cparElNam, _ := pnode.AttributeString("el")
+				dbgStr := fmt.Sprintf("//dbg -- codespan (state: %d) children: %d parent: %s\n", istate, c.ChildCount(), cparElNam.(string))
+				_, _ = w.WriteString(dbgStr)
+			}
+*/
+			if istate == 1 {
+				istate = 0
+				r.count++
+				elNam := fmt.Sprintf("el%d",r.count)
+				txtEl := "const " + elNam + "=document.createTextNode(`"+string(text)+"`);\n"
+				_, _ = w.WriteString(txtEl)
+				apStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+				_, _ = w.WriteString(apStr)
+				text = nil
+			}
+
+			r.renderCodeSpan(w,source,c.(*ast.CodeSpan), true)
+
+		default:
+
+			if r.dbg {
+				dbgStr := fmt.Sprintf("//dbg -- other type: %s\n", c.Kind().String())
+				_, _ = w.WriteString(dbgStr)
+			}
+
+		}
+
+	}
+
+	if text != nil {
+			r.count++
+			elNam := fmt.Sprintf("el%d",r.count)
+			node.SetAttributeString("el",elNam)
+
+			txtEl := "const " + elNam + "=document.createTextNode(`"+string(text)+"`);\n"
+			_, _ = w.WriteString(txtEl)
+			apStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+			_, _ = w.WriteString(apStr)
+			text = nil
+	}
+
+	return ast.WalkSkipChildren, nil
+}
+
+/*
+		segment := c.(*ast.Text).Segment
+		value := segment.Value(source)
+		if r.dbg {
+				valStr := fmt.Sprintf("//dbg -- child[%d]: %s\n", len(value),string(value))
+				_, _ = w.WriteString(valStr)
+		}
+// ! softline break
+
+		if bytes.HasSuffix(value, []byte("\n")) {
+			value[len(value) -1] = ' '
+		}
+		text = append(text, value...)
+	}
+
+	text[len(text) -1] = '\n'
+
+	txtEl := "const " + elNam + "=document.createTextNode(`"+string(text)+"`);\n"
+			_, _ = w.WriteString(txtEl)
+
 
 		if r.dbg {
 			dbgStr := fmt.Sprintf("// dbg -- el: %s parent:%s kind:%s\n", elNam, parElNam, pnode.Kind().String())
@@ -722,15 +891,13 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, node ast.Nod
 		}
 		elStr := parElNam.(string) + ".appendChild(" + elNam.(string) + ");\n"
 		_, _ = w.WriteString(elStr)
-
-//		_, _ = w.WriteString("</p>\n")
 	}
-	return ast.WalkContinue, nil
-}
+*/
+
+
 
 //new
 func (r *Renderer) renderTextBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-
 
 	if entering {
 		text := make([]byte,0,1024)
@@ -934,6 +1101,7 @@ func (r *Renderer) renderAutoLink(
 var CodeAttributeFilter = GlobalAttributeFilter
 
 func (r *Renderer) renderCodeSpan(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+// needs rework
 	if entering {
 		r.count++
 		elNam := fmt.Sprintf("el%d",r.count)
@@ -943,9 +1111,11 @@ func (r *Renderer) renderCodeSpan(w util.BufWriter, source []byte, node ast.Node
 		if node.Attributes() != nil {
 			RenderElAttributes(w, node, CodeAttributeFilter, elNam)
 		}
+		if r.dbg {
+			valStr := fmt.Sprintf("//dbg -- codespan: children %d\n", node.ChildCount())
+			_, _ = w.WriteString(valStr)
+		}
 
-//		spanStr := "let spanTxt = {};\n"
-//		_, _ = w.WriteString(spanStr)
 		spanCount :=0
 		for c := node.FirstChild(); c != nil; c = c.NextSibling() {
 			spanCount++
@@ -967,9 +1137,22 @@ func (r *Renderer) renderCodeSpan(w util.BufWriter, source []byte, node ast.Node
 			elStr := elNam + ".appendChild("+spanTxtEl +");\n"
 			_, _ = w.WriteString(elStr)
 		}
-		return ast.WalkSkipChildren, nil
-	}
 
+		pnode := node.Parent()
+		if pnode == nil {return ast.WalkStop, fmt.Errorf("Par -- no pnode")}
+		parElNam, res := pnode.AttributeString("el")
+		if !res {return ast.WalkStop, fmt.Errorf("Par -- no parent el name: %s!", elNam)}
+		if r.dbg {
+			dbgStr := fmt.Sprintf("// dbg -- codespan el: %s kind: %s parent:%s kind:%s\n", elNam, node.Kind().String(), parElNam, pnode.Kind().String())
+			_, _ = w.WriteString(dbgStr)
+		}
+		elStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+		_, _ = w.WriteString(elStr)
+
+	}
+	return ast.WalkSkipChildren, nil
+}
+/*
 	pnode := node.Parent()
 	if pnode == nil {return ast.WalkStop, fmt.Errorf("Code Span -- no pnode")}
 	elNam, res := node.AttributeString("el")
@@ -985,12 +1168,12 @@ func (r *Renderer) renderCodeSpan(w util.BufWriter, source []byte, node ast.Node
 	_, _ = w.WriteString(elStr)
 	return ast.WalkContinue, nil
 }
+*/
 
 // EmphasisAttributeFilter defines attribute names which emphasis elements can have.
 var EmphasisAttributeFilter = GlobalAttributeFilter
 
-func (r *Renderer) renderEmphasis(
-	w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+func (r *Renderer) renderEmphasis(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	n := node.(*ast.Emphasis)
 	tag := "em"
 	if n.Level == 2 {
@@ -1004,24 +1187,29 @@ func (r *Renderer) renderEmphasis(
 		node.SetAttributeString("el",elNam)
 		_, _ = w.WriteString(elStr)
 		if n.Attributes() != nil {RenderElAttributes(w, node, EmphasisAttributeFilter, elNam)}
-	} else {
-		pnode := node.Parent()
-		if pnode == nil {return ast.WalkStop, fmt.Errorf("Emphasis -- no pnode")}
-		elNam, res := node.AttributeString("el")
-		if !res {return ast.WalkStop, fmt.Errorf("Emphasis --no el name!")}
-		parElNam, res := pnode.AttributeString("el")
-		if !res {return ast.WalkStop, fmt.Errorf("Emphasis -- no parent el name: %s!", elNam)}
-		if r.dbg {
-			dbgStr := fmt.Sprintf("// dbg -- el: %s parent:%s kind:%s\n", elNam, parElNam, pnode.Kind().String())
-			_, _ = w.WriteString(dbgStr)
+//child
+		chn := n.FirstChild()
+		if _, ok := chn.(*ast.Text); ok {
+	        segment := chn.(*ast.Text).Segment
+    	    value := segment.Value(source)
+			chStr := elNam + ".textContent='" + string(value) + "'\n";
+			_, _ = w.WriteString(chStr)
 		}
-		elStr := parElNam.(string) + ".appendChild(" + elNam.(string) + ");\n"
-		_, _ = w.WriteString(elStr)
-
-//		_, _ = w.WriteString("</")
-//		_, _ = w.WriteString(tag)
-//		_ = w.WriteByte('>')
+		return ast.WalkSkipChildren, nil
 	}
+	pnode := node.Parent()
+	if pnode == nil {return ast.WalkStop, fmt.Errorf("Emphasis -- no pnode")}
+	elNam, res := node.AttributeString("el")
+	if !res {return ast.WalkStop, fmt.Errorf("Emphasis --no el name!")}
+	parElNam, res := pnode.AttributeString("el")
+	if !res {return ast.WalkStop, fmt.Errorf("Emphasis -- no parent el name: %s!", elNam)}
+	if r.dbg {
+		dbgStr := fmt.Sprintf("// dbg -- el: %s parent:%s kind:%s\n", elNam, parElNam, pnode.Kind().String())
+		_, _ = w.WriteString(dbgStr)
+	}
+	elStr := parElNam.(string) + ".appendChild(" + elNam.(string) + ");\n"
+	_, _ = w.WriteString(elStr)
+
 	return ast.WalkContinue, nil
 }
 
