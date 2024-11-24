@@ -8,6 +8,8 @@ let mdStyle = {
 	p: {margin: '1rem 0'},
 	code: {fontFamily: 'monospace'},
 	block: {margin: '0px 40px', color: 'purple', backgroundColor: 'lightgrey',},
+	a: {color: 'blue', textDecoration: 'underline',},
 	ul: {margin: '0 0 0 10px'},
-	li: {listStylePosition: 'inside'},
+	ol: {margin: '0 0 0 10px'},
+	li: {listStylePosition: 'outside', margin: '0 0 0 30px'},
 };
