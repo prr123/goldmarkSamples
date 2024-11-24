@@ -687,14 +687,11 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, node ast.Node
 		elStr := "let " + elNam + "= document.createElement('li');\n"
 		_,_ = w.WriteString(elStr)
 		if node.Attributes() != nil {RenderElAttributes(w, node, ListItemAttributeFilter, elNam)}
-//css
-		cssStr := "Object.assign(" + elNam + ".style, mdStyle.li);\n"
-		_, _ = w.WriteString(cssStr)
+
 
 		fc := node.FirstChild()
 		if fc != nil {
 			if _, ok := fc.(*ast.TextBlock); !ok {
-//fmt.Printf("dbg -- has no textBlock\n")
 				_,_ = w.WriteString(elNam + ".textContent='\n';\n")
 			}
 		}
@@ -844,14 +841,7 @@ fmt.Printf("dbg -- children return\n")
 			}
 
 		case *ast.CodeSpan:
-/*
-			if r.dbg {
-				pnode := c.Parent()
-				cparElNam, _ := pnode.AttributeString("el")
-				dbgStr := fmt.Sprintf("//dbg -- codespan (state: %d) children: %d parent: %s\n", istate, c.ChildCount(), cparElNam.(string))
-				_, _ = w.WriteString(dbgStr)
-			}
-*/
+
 			if istate == 1 {
 				istate = 0
 				r.count++
@@ -865,8 +855,65 @@ fmt.Printf("dbg -- children return\n")
 
 			r.renderCodeSpan(w,source,c.(*ast.CodeSpan), true)
 
-		default:
+		case *ast.Image:
+			if istate == 1 {
+				istate = 0
+				r.count++
+				elNam := fmt.Sprintf("el%d",r.count)
+				txtEl := "const " + elNam + "=document.createTextNode(`"+string(text)+"`);\n"
+				_, _ = w.WriteString(txtEl)
+				apStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+				_, _ = w.WriteString(apStr)
+				text = nil
+			}
 
+			r.renderImage(w,source,c.(*ast.CodeSpan), true)
+
+
+		case *ast.Link:
+
+			if istate == 1 {
+				istate = 0
+				r.count++
+				elNam := fmt.Sprintf("el%d",r.count)
+				txtEl := "const " + elNam + "=document.createTextNode(`"+string(text)+"`);\n"
+				_, _ = w.WriteString(txtEl)
+				apStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+				_, _ = w.WriteString(apStr)
+				text = nil
+			}
+
+			r.renderLink(w,source,c.(*ast.Link), true)
+
+		case *ast.RawHTML:
+			if istate == 1 {
+				istate = 0
+				r.count++
+				elNam := fmt.Sprintf("el%d",r.count)
+				txtEl := "const " + elNam + "=document.createTextNode(`"+string(text)+"`);\n"
+				_, _ = w.WriteString(txtEl)
+				apStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+				_, _ = w.WriteString(apStr)
+				text = nil
+			}
+
+			r.renderRawHTML(w,source,c.(*ast.RawHTML), true)
+
+		case *ast.String:
+			if istate == 1 {
+				istate = 0
+				r.count++
+				elNam := fmt.Sprintf("el%d",r.count)
+				txtEl := "const " + elNam + "=document.createTextNode(`"+string(text)+"`);\n"
+				_, _ = w.WriteString(txtEl)
+				apStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+				_, _ = w.WriteString(apStr)
+				text = nil
+			}
+
+			r.renderString(w,source,c.(*ast.String), true)
+
+		default:
 			if r.dbg {
 				dbgStr := fmt.Sprintf("//dbg -- other type: %s\n", c.Kind().String())
 				_, _ = w.WriteString(dbgStr)
@@ -1167,7 +1214,7 @@ func (r *Renderer) renderEmphasis(w util.BufWriter, source []byte, node ast.Node
 		node.SetAttributeString("el",elNam)
 		_, _ = w.WriteString(elStr)
 		if n.Attributes() != nil {RenderElAttributes(w, node, EmphasisAttributeFilter, elNam)}
-//child
+		// child
 		chn := n.FirstChild()
 		if _, ok := chn.(*ast.Text); ok {
 	        segment := chn.(*ast.Text).Segment
@@ -1201,45 +1248,47 @@ func (r *Renderer) renderLink(w util.BufWriter, source []byte, node ast.Node, en
 		elStr:= "let " + elNam + "=document.createElement(\"a\");\n"
 		node.SetAttributeString("el",elNam)
 		_, _ = w.WriteString(elStr)
-// need to add href ref
-//		_, _ = w.WriteString("<a href=\"")
 		if r.Unsafe || !IsDangerousURL(n.Destination) {
 //			_, _ = w.Write(util.EscapeHTML(util.URLEscape(n.Destination, true)))
-			el2Str:= elNam + ".href=" + string(util.EscapeHTML(util.URLEscape(n.Destination, true)))
-//		_, _ = w.Write(util.EscapeHTML(util.URLEscape(n.Destination, true)))
+			el2Str:= elNam + ".href='" + string(util.EscapeHTML(util.URLEscape(n.Destination, true))) +"';\n"
 			_, _ = w.WriteString(el2Str)
 		}
-
-//	el3Str := elNam + ".alt=\""
-//	_, _ = w.WriteString(el3Str)
-//	r.renderTexts(w, source, n)
-//	_, _ = w.WriteString("\"\n")
-
 		if n.Title != nil {
-//		_, _ = w.WriteString(` title="`)
-			el4Str := elNam + ".title='" + string(n.Title) + "'\n"
-//		r.Writer.Write(w, n.Title)
+			el4Str := elNam + ".title='" + string(n.Title) + "';\n"
 			_,_ = w.WriteString(el4Str)
 		}
 		if n.Attributes() != nil {
 			RenderElAttributes(w, n, LinkAttributeFilter, elNam)
 		}
-	} else {
+//css
+		cssStr := "Object.assign(" + elNam + ".style, mdStyle.a);\n"
+		_, _ = w.WriteString(cssStr)
+
+		// child
+		fc := n.FirstChild()
+		if fc != nil {
+			if _, ok := fc.(*ast.Text); ok {
+        		segment := fc.(*ast.Text).Segment
+        		value := segment.Value(source)
+				elTxtStr := elNam + ".textContent='" + string(value) + "';\n"
+				_, _ = w.WriteString(elTxtStr)
+//				_,_ = w.WriteString(elNam + ".textContent='\n';\n")
+			}
+		}
 //		_, _ = w.WriteString("</a>")
 		pnode := node.Parent()
 		if pnode == nil {return ast.WalkStop, fmt.Errorf("Link -- no pnode")}
-		elNam, res := node.AttributeString("el")
-		if !res {return ast.WalkStop, fmt.Errorf("Link -- no el name!")}
 		parElNam, res := pnode.AttributeString("el")
 		if !res {return ast.WalkStop, fmt.Errorf("Link -- no parent el name: %s!", elNam)}
 		if r.dbg {
 			dbgStr := fmt.Sprintf("// dbg -- el: %s parent:%s kind:%s\n", elNam, parElNam, pnode.Kind().String())
 			_, _ = w.WriteString(dbgStr)
 		}
-		elStr := parElNam.(string) + ".appendChild(" + elNam.(string) + ");\n"
-		_, _ = w.WriteString(elStr)
+		apStr := parElNam.(string) + ".appendChild(" + elNam+ ");\n"
+		_, _ = w.WriteString(apStr)
 	}
-	return ast.WalkContinue, nil
+	return ast.WalkSkipChildren, nil
+//	return ast.WalkContinue, nil
 }
 
 // ImageAttributeFilter defines attribute names which image elements can have.
