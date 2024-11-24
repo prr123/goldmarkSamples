@@ -686,6 +686,10 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, node ast.Node
 		node.SetAttributeString("el",elNam)
 		elStr := "let " + elNam + "= document.createElement('li');\n"
 		_,_ = w.WriteString(elStr)
+
+		p2Str := "Object.assign(" + elNam + ".style, mdStyle.li);\n"
+		_, _ = w.WriteString(p2Str)
+
 		if node.Attributes() != nil {RenderElAttributes(w, node, ListItemAttributeFilter, elNam)}
 
 
