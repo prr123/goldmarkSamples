@@ -25,4 +25,13 @@ status: in progress
 
 ## md2jsV3: Performance enhancement
 
-status: in design  
+replaced rendering textblocks and paragraphs that have multiple inline 
+renderering functions with a single renderTextChildren function
+
+status: in testing  
+
+## AstDump
+
+dumps the ast tree of a document to a text file.  
+
+status: working
