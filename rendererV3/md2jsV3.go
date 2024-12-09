@@ -23,6 +23,12 @@ type metaInp struct {
 	Name string `yaml:"name"`
 }
 
+type compInp struct {
+	Meta []byte
+	Summary []byte
+	Main []byte
+}
+
 func GetMeta(indata []byte) (meta *metaInp, err error) {
 
 	var metaData metaInp
@@ -42,7 +48,7 @@ func PrintMeta(meta *metaInp) {
 	fmt.Println("**** end MetaData ****")
 }
 
-func StartRenderFun() (start []byte){
+func JSRenderStartFunc() (start []byte){
 	str := `let site = {
     name: 'mdtest',
 };
@@ -682,7 +688,6 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, node ast.Node
 	if entering {
 		r.count++
 		elNam := fmt.Sprintf("el%d",r.count)
-//fmt.Printf("dbg -- list item %d\n", r.count)
 		node.SetAttributeString("el",elNam)
 		elStr := "let " + elNam + "= document.createElement('li');\n"
 		_,_ = w.WriteString(elStr)
@@ -691,18 +696,10 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, node ast.Node
 		_, _ = w.WriteString(p2Str)
 
 		if node.Attributes() != nil {RenderElAttributes(w, node, ListItemAttributeFilter, elNam)}
+		return ast.WalkContinue, nil
 
-
-		fc := node.FirstChild()
-		if fc != nil {
-			if _, ok := fc.(*ast.TextBlock); !ok {
-				_,_ = w.WriteString(elNam + ".textContent='\n';\n")
-			}
-		}
 	} else {
 
-//fmt.Printf("dbg -- li item return\n")
-//		_, _ = w.WriteString("</li>\n")
 		pnode := node.Parent()
 		if pnode == nil {return ast.WalkStop, fmt.Errorf("List Item -- no pnode")}
 		elNam, res := node.AttributeString("el")
@@ -718,7 +715,49 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, node ast.Node
 
 	}
 	return ast.WalkContinue, nil
+
 }
+
+/*
+		fc := node.FirstChild()
+		if r.dbg {
+			dbgStr := fmt.Sprintf("// dbg -- par el: %s kind: %s children: %d first kind:%s count:%d\n", elNam, node.Kind().String(), node.ChildCount(), fc.Kind().String(), fc.ChildCount())
+			_, _ = w.WriteString(dbgStr)
+		}
+
+
+		if node.ChildCount() != 1 {
+
+			if fc == nil {
+				elTxtStr := elNam + ".textContent='\n';\n"
+				_, _ = w.WriteString(elTxtStr)
+				return ast.WalkSkipChildren, nil
+			}
+
+		}
+
+		// if text block
+		if _,ok :=fc.(*ast.TextBlock); ok {
+//			return ast.WalkStop, fmt.Errorf("Li Item -- fc not a textblock!!")
+
+			fc.SetAttributeString("el",elNam)
+			r.renderTextChildren(w,source,fc, true)
+
+			pnode := node.Parent()
+			if pnode == nil {return ast.WalkStop, fmt.Errorf("Li Item -- no pnode")}
+			parElNam, res := pnode.AttributeString("el")
+			if !res {return ast.WalkStop, fmt.Errorf("Li Item -- no parent el name: %s!", elNam)}
+			apStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
+			_, _ = w.WriteString(apStr)
+			return ast.WalkSkipChildren, nil
+		}
+//par
+		if _,ok :=fc.(*ast.Paragraph); ok {
+
+		}
+*/
+
+
 
 // ParagraphAttributeFilter defines attribute names which paragraph elements can have.
 var ParagraphAttributeFilter = GlobalAttributeFilter
@@ -760,7 +799,7 @@ func (r *Renderer) renderTextChildren(w util.BufWriter, source []byte, node ast.
 
 //seems redundant
 	if !entering {
-fmt.Printf("dbg -- children return\n")
+//fmt.Printf("dbg -- children return\n")
 		return ast.WalkContinue, nil
 	}
 
@@ -773,8 +812,26 @@ fmt.Printf("dbg -- children return\n")
 		_, _ = w.WriteString(dbgStr)
 	}
 
+	fc := node.FirstChild()
+	if node.ChildCount() == 1 {
+		if fc == nil {
+			elTxtStr := parElNam.(string) + ".textContent='\n';\n"
+			_, _ = w.WriteString(elTxtStr)
+			return ast.WalkSkipChildren, nil
+		}
+		if _,ok :=fc.(*ast.Text); ok {
+        	segment := fc.(*ast.Text).Segment
+        	value := segment.Value(source)
+
+			elTxtStr := parElNam.(string) + ".textContent=`" + string(value) + "`;\n"
+			_, _ = w.WriteString(elTxtStr)
+			return ast.WalkSkipChildren, nil
+		}
+	}
+
 	istate := 0
-	for c := node.FirstChild(); c != nil; c = c.NextSibling() {
+//	for c := node.FirstChild(); c != nil; c = c.NextSibling() {
+	for c := fc; c != nil; c = c.NextSibling() {
 /*
 		if r.dbg {
 				parElNam, res := c.Parent().AttributeString("el")
@@ -838,7 +895,7 @@ fmt.Printf("dbg -- children return\n")
 				elNam := fmt.Sprintf("el%d",r.count)
 				elStr := "let " + elNam + "=document.createElement('" + tag + "');\n"
 				_, _ = w.WriteString(elStr)
-				eltxt := elNam + ".textContent='" + string(value) + "';\n"
+				eltxt := elNam + ".textContent=`" + string(value) + "`;\n"
 				_, _ = w.WriteString(eltxt)
 				apStr := parElNam.(string) + ".appendChild(" + elNam + ");\n"
 				_, _ = w.WriteString(apStr)
@@ -1223,7 +1280,7 @@ func (r *Renderer) renderEmphasis(w util.BufWriter, source []byte, node ast.Node
 		if _, ok := chn.(*ast.Text); ok {
 	        segment := chn.(*ast.Text).Segment
     	    value := segment.Value(source)
-			chStr := elNam + ".textContent='" + string(value) + "'\n";
+			chStr := elNam + ".textContent=`" + string(value) + "`\n";
 			_, _ = w.WriteString(chStr)
 		}
 		return ast.WalkSkipChildren, nil
@@ -1274,7 +1331,7 @@ func (r *Renderer) renderLink(w util.BufWriter, source []byte, node ast.Node, en
 			if _, ok := fc.(*ast.Text); ok {
         		segment := fc.(*ast.Text).Segment
         		value := segment.Value(source)
-				elTxtStr := elNam + ".textContent='" + string(value) + "';\n"
+				elTxtStr := elNam + ".textContent=`" + string(value) + "`;\n"
 				_, _ = w.WriteString(elTxtStr)
 //				_,_ = w.WriteString(elNam + ".textContent='\n';\n")
 			}
@@ -1779,4 +1836,49 @@ func GetRenderer(nam string, dbg bool) (r renderer.Renderer) {
 	if dbg {log.Println("*** debugging ***")}
 	r = renderer.NewRenderer(renderer.WithNodeRenderers(util.Prioritized(NewRenderer(nam, dbg), 1000)))
 	return r
+}
+
+
+func GetMetaSum(inp []byte)(comp compInp, err error) {
+
+	if inp == nil {return  comp, fmt.Errorf("no input!")}
+
+	metaidxst := bytes.Index(inp, []byte("---\n"))
+	metaidxend := -2
+//	if metaidxst > 0 {return comp, fmt.Errorf("invalid meta start!")}
+	if metaidxst >-1 {
+		metaidxend = bytes.Index(inp[metaidxst+4:], []byte("---\n"))
+		if metaidxend == -1 {return comp, fmt.Errorf("no meta end!")}
+		metaidxend = metaidxend + metaidxst + 8
+		comp.Meta = inp[metaidxst:metaidxend]
+//fmt.Printf("dbg -- meta %d:%d\n", metaidxst, metaidxend)
+	}
+
+	sumidxst := bytes.Index(inp, []byte("# Summary"))
+	sumidxend := -2
+	if sumidxst > -1 {
+		sumidxend = bytes.Index(inp[sumidxst+9:], []byte("#"))
+		if sumidxend > -1 {
+			sumidxend = sumidxst + sumidxend + 9
+			comp.Summary = inp[sumidxst:sumidxend]
+		}
+	}
+
+//	comp.Main = inp
+	if comp.Meta != nil {
+		if comp.Summary != nil {
+			comp.Main = inp[sumidxend:]
+		} else {
+			comp.Main = inp[metaidxend:]
+		}
+		return comp, nil
+	}
+
+	if comp.Summary != nil {
+		comp.Main = inp[sumidxend:]
+		return comp, nil
+	}
+
+	comp.Main = inp[:]
+	return comp, nil
 }
