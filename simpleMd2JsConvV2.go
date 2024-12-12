@@ -25,11 +25,11 @@ import (
 func main() {
 
 	var buf bytes.Buffer
-	
-	numarg := len(os.Args)
-    flags:=[]string{"dbg", "in", "out", "style"}
 
-    useStr := " /in=infile /out=outfile [/style=styleFile] [/dbg]"
+	numarg := len(os.Args)
+    flags:=[]string{"dbg", "in", "out", "style", "site"}
+
+    useStr := " /in=infile /out=outfile [/style=styleFile] [/site=siteFile] [/dbg]"
     helpStr := "markdown to html conversion program V2"
 
     if numarg > len(flags) +1 {
@@ -69,26 +69,35 @@ func main() {
         outFil = outval.(string)
     }
 
-    stylFil := "defStyle"
+    stylFil := "mdStyle"
     stylval, ok := flagMap["style"]
     if ok {
         if stylval.(string) == "none" {log.Fatalf("error -- no style file name provided!\n")}
         stylFil = stylval.(string)
     }
 
+    siteFil := "mdSite"
+    siteval, ok := flagMap["site"]
+    if ok {
+        if siteval.(string) == "none" {log.Fatalf("error -- no site file name provided!\n")}
+        siteFil = siteval.(string)
+    }
+
 	inFilnam := "md/" + inFil + ".md"
 	metaFilnam := "md/" + inFil + ".meta"
 	outFilnam := "script/" + outFil + ".js"
 	stylFilnam := "style/" + stylFil + ".js"
+	siteFilnam := "site/" + siteFil + ".js"
 
 	if dbg {
 		fmt.Printf("input:  %s\n", inFilnam)
 		fmt.Printf("output: %s\n", outFilnam)
 		fmt.Printf("style:  %s\n", stylFilnam)
+		fmt.Printf("site:   %s\n", siteFilnam)
 		fmt.Printf("meta:   %s\n", metaFilnam)
 	}
 
-	source, err := os.ReadFile(inFilnam)
+	mdData, err := os.ReadFile(inFilnam)
 	if err != nil {log.Fatalf("error -- open file: %v\n", err)}
 
 	metaData, err := os.ReadFile(metaFilnam)
@@ -97,12 +106,12 @@ func main() {
 	stylData, err := os.ReadFile(stylFilnam)
 	if err != nil {log.Printf("info -- no style file: %v\n", err)}
 
+	siteData, err := os.ReadFile(siteFilnam)
+	if err != nil {log.Printf("info -- no style file: %v\n", err)}
+
 	oFil, err := os.Create(outFilnam)
 	if err != nil {log.Fatalf("error -- create out File: %v\n", err)}
 	defer oFil.Close()
-
-	_, err = oFil.Write(stylData)
-	if err != nil {log.Fatalf("error -- writing style: %v\n", err)}
 
 	if len(metaData) > 0 {
 		mData, err := md2js.GetMeta(metaData)
@@ -110,21 +119,43 @@ func main() {
 		md2js.PrintMeta(mData)
 	}
 
+	startMdStr := md2js.StartRenderFun()
+	_, err = oFil.Write(startMdStr)
+	if err != nil {log.Fatalf("error -- writing md start Render: %v\n")}
+
+	_, err = oFil.Write(stylData)
+	if err != nil {log.Fatalf("error -- writing style: %v\n", err)}
+
 	name:= "test"
 	md2jsRen := md2js.GetRenderer(name,dbg)
 	md := goldmark.New()
 	md.SetRenderer(md2jsRen)
 
+	// retrieve yaml data from mdData if present
+
+	// retrieve summary md data from mdData if present
+
+	// retrieve body md data from mdData if present
+
 // func Convert(source []byte, w io.Writer, opts ...parser.ParseOption) error
 //	err = goldmark.Convert(source, &buf, parser.WithContext(ctx))
-	err = md.Convert(source, &buf)
-	if err != nil {log.Fatalf("error -- convert: %v\n",err)}
-	log.Printf("*** success converting ***\n")
-
+	errcon := md.Convert(mdData, &buf)
+	if errcon != nil {
+		log.Printf("error -- converting: %v\n",errcon)
+	} else {
+		log.Printf("*** success converting ***\n")
+	}
 	// save
-//	err = os.WriteFile(outFilnam, buf.Bytes(), 0666)
+//fmt.Printf("dbg -- buf length: %d\n", len(buf.Bytes()))
 	_, err = oFil.Write(buf.Bytes())
-	if err != nil {log.Fatalf("error -- write file: %v\n")}
+	if err != nil {log.Fatalf("error -- writing md js body: %v\n")}
 
-	log.Println("*** success ***")
+	_, err = oFil.Write(siteData)
+	if err != nil {log.Fatalf("error -- writing site: %v\n", err)}
+
+	if errcon != nil {
+		log.Println("*** error conversion ***")
+	} else {
+		log.Println("*** success ***")
+	}
 }
