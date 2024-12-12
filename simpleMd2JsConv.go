@@ -79,14 +79,13 @@ func main() {
 	}
 
 	source, err := os.ReadFile(inFilnam)
-	if err != nil {log.Fatalf("error -- open file: %v\n")}
+	if err != nil {log.Fatalf("error -- open file: %v\n", err)}
 
-	md2jsRen := md2js.GetRenderer()
-//renderer.NewRenderer(renderer.WithNodeRenderers(util.Prioritized(md2js.NewRenderer(), 1000)))
+	md2jsRen := md2js.GetRenderer(dbg)
 	md := goldmark.New()
 	md.SetRenderer(md2jsRen)
 
-	// func Convert(source []byte, w io.Writer, opts ...parser.ParseOption) error
+// func Convert(source []byte, w io.Writer, opts ...parser.ParseOption) error
 //	err = goldmark.Convert(source, &buf, parser.WithContext(ctx))
 	err = md.Convert(source, &buf)
 	if err != nil {log.Fatalf("error -- convert: %v\n",err)}
