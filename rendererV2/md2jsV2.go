@@ -667,10 +667,11 @@ func (r *Renderer) renderListItem(w util.BufWriter, source []byte, node ast.Node
 		if fc != nil {
 			if _, ok := fc.(*ast.TextBlock); !ok {
 //fmt.Printf("dbg -- has no textBlock\n")
-				_,_ = w.WriteString(elNam + ".textContent='\n';")
+				_,_ = w.WriteString(elNam + ".textContent='\n';\n")
 			}
 		}
 	} else {
+
 //fmt.Printf("dbg -- li item return\n")
 //		_, _ = w.WriteString("</li>\n")
 		pnode := node.Parent()
@@ -727,10 +728,60 @@ func (r *Renderer) renderParagraph(w util.BufWriter, source []byte, node ast.Nod
 	return ast.WalkContinue, nil
 }
 
+//new
 func (r *Renderer) renderTextBlock(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+
+
+	if entering {
+		text := make([]byte,0,1024)
+		r.count++
+		elNam := fmt.Sprintf("el%d",r.count)
+		node.SetAttributeString("el",elNam)
+
+		for c := node.FirstChild(); c != nil; c = c.NextSibling() {
+			if _, ok := c.(*ast.Text); !ok {
+				break
+			}
+			segment := c.(*ast.Text).Segment
+			value := segment.Value(source)
+			if r.dbg {
+				valStr := fmt.Sprintf("//dbg -- child[%d]: %s\n", len(value),string(value))
+				_, _ = w.WriteString(valStr)
+			}
+// ! softline break
+
+			if bytes.HasSuffix(value, []byte("\n")) {
+				value[len(value) -1] = ' '
+			}
+			text = append(text, value...)
+		}
+
+		text[len(text) -1] = '\n'
+
+		txtEl := "const " + elNam + "=document.createTextNode(`"+string(text)+"`);\n"
+			_, _ = w.WriteString(txtEl)
+
+	} else {
+		pnode := node.Parent()
+		if pnode == nil {return ast.WalkStop, fmt.Errorf("txt -- no pnode")}
+		elNam, res := node.AttributeString("el")
+		if !res {return ast.WalkStop, fmt.Errorf("txt -- no el name!")}
+		parElNam, res := pnode.AttributeString("el")
+		if !res {return ast.WalkStop, fmt.Errorf("txt -- no parent el name: %s!", elNam)}
+
+		if r.dbg {
+			dbgStr := fmt.Sprintf("// dbg -- el: %s parent:%s kind:%s\n", elNam, parElNam, pnode.Kind().String())
+			_, _ = w.WriteString(dbgStr)
+		}
+		elStr := parElNam.(string) + ".appendChild(" + elNam.(string) + ");\n"
+		_, _ = w.WriteString(elStr)
+	}
+	return ast.WalkSkipChildren, nil
+}
+
+func (r *Renderer) renderTextBlock3(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	// temp
 	if entering {
-//fmt.Printf("dbg -- textBlock entering \n")
 		pnode := node.Parent()
 		parElNam, res := pnode.AttributeString("el")
 		if !res {return ast.WalkStop, fmt.Errorf("Par -- no parent el name: %s!", parElNam)}
@@ -739,6 +790,7 @@ func (r *Renderer) renderTextBlock(w util.BufWriter, source []byte, node ast.Nod
 
 	return ast.WalkContinue, nil
 }
+
 
 func (r *Renderer) renderTextBlock2(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	// temp
@@ -1159,8 +1211,9 @@ func (r *Renderer) renderText(w util.BufWriter, source []byte, node ast.Node, en
 	elNam := fmt.Sprintf("el%d",r.count)
 	n.SetAttributeString("el",elNam)
 //fmt.Printf("dbg -- el: %d raw text: %t\n", r.count, n.IsRaw())
-		value := segment.Value(source)
-		valStr := string(segment.Value(source))
+
+	value := segment.Value(source)
+	valStr := string(segment.Value(source))
 
 	if n.IsRaw() {
 //		_, _ = w.WriteString(segment.Value(source))
